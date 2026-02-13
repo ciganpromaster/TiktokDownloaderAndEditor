@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Editor UI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .preset-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .preset-card:hover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+
+        .preset-card.selected {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-ready {
+            background-color: #28a745;
+        }
+
+        .status-processing {
+            background-color: #ffc107;
+            animation: pulse 1s infinite;
+        }
+
+        .status-error {
+            background-color: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .text-overlay-item {
+            font-size: 0.9em;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .segment-item {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .text-overlay-item {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+
+        .file-picker-modal .modal-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .file-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .file-item.selected {
+            background-color: #e3f2fd;
+            border-color: #007bff;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        select,
+        button {
+            padding: 8px;
+            margin: 10px 0;
+        }
+
+        #output,
+        #error,
+        #preset-details {
+            margin-top: 20px;
+        }
+
+        #output {
+            color: green;
+        }
+
+        #error {
+            color: red;
+        }
+
+        #preset-details {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- TikTok Scraper Section -->
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fab fa-tiktok"></i> TikTok Downloader (No Watermark)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label">Download New User</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">@</span>
+                                    <input type="text" id="tiktokUsername" class="form-control" placeholder="username">
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-dark w-100" onclick="scrapeTikTok()" id="scrapeBtn">
+                                    <i class="fas fa-download"></i> Scrape
+                                </button>
+                                <button class="btn btn-danger w-100 mt-2 d-none" onclick="stopScrape()"
+                                    id="stopScrapeBtn">
+                                    <i class="fas fa-stop"></i> Stop
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Or Choose Existing User</label>
+                                <div class="input-group">
+                                    <select id="existingTikTokUsers" class="form-select"
+                                        onchange="onUserSelectChange()">
+                                        <option value="">-- No User Selected --</option>
+                                    </select>
+                                    <button class="btn btn-outline-dark" onclick="loadTikTokUsers()">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="scrapeStatus" class="mt-3 d-none">
+                            <div class="progress mb-2">
+                                <div id="scrapeProgressBar"
+                                    class="progress-bar progress-bar-animated progress-bar-striped bg-dark"
+                                    role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small id="scrapeStatusText" class="text-muted"></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Selection Section -->
+            <div id="videoSelectionSection" class="col-12 mb-4 d-none">
+                <div class="card">
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-video"></i> Select Videos to Edit</h5>
+                        <div>
+                            <button class="btn btn-sm btn-light" onclick="toggleAllVideos(true)">Select All</button>
+                            <button class="btn btn-sm btn-outline-light" onclick="toggleAllVideos(false)">Deselect
+                                All</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="videoList" class="row row-cols-1 row-cols-md-4 g-3"
+                            style="max-height: 400px; overflow-y: auto;">
+                            <!-- Video cards will be here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Image Management Section -->
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-images"></i> Overlay Image Management (tiktokimages)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-5">
+                                <label class="form-label">Upload New Image</label>
+                                <div class="input-group">
+                                    <input type="file" id="imageUploadInput" class="form-control" accept="image/*">
+                                    <button class="btn btn-primary" onclick="uploadImage()">
+                                        <i class="fas fa-upload"></i> Upload
+                                    </button>
+                                </div>
+                                <div id="uploadStatus" class="mt-2 small"></div>
+                            </div>
+                            <div class="col-md-7 border-start">
+                                <label class="form-label d-flex justify-content-between">
+                                    <span>Existing Images</span>
+                                    <button class="btn btn-link btn-sm p-0" onclick="loadImages()">Refresh</button>
+                                </label>
+                                <div id="imageList" class="d-flex flex-wrap gap-2 p-2 rounded bg-light"
+                                    style="max-height: 200px; overflow-y: auto;">
+                                    <!-- Images will be listed here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list"></i> Video Presets
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <button class="btn btn-primary btn-sm" onclick="openCreatePresetModal()">
+                                <i class="fas fa-plus"></i> Add Preset
+                            </button>
+                        </div>
+                        <div id="presetList">
+                            <!-- Presets will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog"></i> Configuration
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="configEditor">
+                            <!-- Configuration editor will be loaded here -->
+                        </div>
+
+                        <div class="mt-4">
+                            <button class="btn btn-success btn-lg" onclick="createVideo()" id="createBtn">
+                                <i class="fas fa-play"></i> Create Video
+                            </button>
+                        </div>
+
+                        <div id="statusArea">
+                            <div class="alert alert-info">
+                                <span class="status-indicator status-ready"></span>
+                                Ready to create video
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Lightbox Modal -->
+    <div class="modal fade" id="videoLightboxModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-md">
+            <div class="modal-content bg-dark border-0">
+                <div class="modal-body p-0 position-relative">
+                    <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 z-3"
+                        data-bs-dismiss="modal" aria-label="Close"></button>
+
+                    <!-- Top Bar with Selection and Title -->
+                    <div class="position-absolute top-0 start-0 w-100 p-3 bg-gradient-down text-white d-flex justify-content-between align-items-center"
+                        style="z-index: 4;">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="lightboxSelectionToggle"
+                                onchange="toggleSelectionFromLightbox()"
+                                style="width: 2.5em; height: 1.25em; cursor: pointer;">
+                            <label class="form-check-label ms-2 small fw-bold"
+                                for="lightboxSelectionToggle text-shadow">Include in Edit</label>
+                        </div>
+                        <span id="lightboxTitle" class="small fw-bold text-truncate mx-4 text-shadow"></span>
+                        <div style="width: 40px;"></div>
+                    </div>
+
+                    <div class="bg-black d-flex align-items-center justify-content-center"
+                        style="height: 85vh; width: 100%;">
+                        <video id="lightboxVideo" controls autoplay playsinline class="h-100 w-100"
+                            style="object-fit: contain; background: #000; z-index: 1;"></video>
+                    </div>
+
+                    <!-- Navigation Buttons -->
+                    <button class="btn btn-link text-white position-absolute top-50 start-0 translate-middle-y fs-1 p-2"
+                        style="z-index: 5; background: rgba(0,0,0,0.15); border-radius: 0 5px 5px 0;"
+                        onclick="navigateLightbox(-1)" id="prevBtn">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="btn btn-link text-white position-absolute top-50 end-0 translate-middle-y fs-1 p-2"
+                        style="z-index: 5; background: rgba(0,0,0,0.15); border-radius: 5px 0 0 5px;"
+                        onclick="navigateLightbox(1)" id="nextBtn">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .bg-gradient-dark {
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+        }
+
+        .bg-gradient-down {
+            background: linear-gradient(rgba(0, 0, 0, 0.8), transparent);
+        }
+
+        .text-shadow {
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .z-3 {
+            z-index: 3;
+        }
+
+        .z-4 {
+            z-index: 4;
+        }
+
+        .z-5 {
+            z-index: 5;
+        }
+
+        #videoList .card-img-top {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        #videoList .card-img-top:hover {
+            opacity: 0.8;
+        }
+    </style>
+
+    <!-- Preset Creation Modal -->
+    <div class="modal fade" id="createPresetModal" tabindex="-1" aria-labelledby="createPresetModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="presetForm" onsubmit="savePreset(event)">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="createPresetModalLabel">Create New Preset</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Preset Name</label>
+                            <input type="text" class="form-control" id="presetName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <input type="text" class="form-control" id="presetDescription">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Include Outro?</label>
+                            <select class="form-select" id="presetOutro">
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Segments</label>
+                            <div id="segmentsContainer"></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+                                onclick="addSegment()">Add
+                                Segment</button>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Text Overlays</label>
+                            <div id="textOverlaysContainer"></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+                                onclick="addTextOverlay()">Add Text Overlay</button>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Output Resolution</label>
+                            <input type="text" class="form-control" id="outputResolution" value="1080x1920" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">FPS</label>
+                            <input type="number" class="form-control" id="outputFps" value="25" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Codec</label>
+                            <input type="text" class="form-control" id="outputCodec" value="libx264" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Audio Codec</label>
+                            <input type="text" class="form-control" id="outputAudioCodec" value="aac" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Audio Bitrate</label>
+                            <input type="text" class="form-control" id="outputAudioBitrate" value="192k" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Preset</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folder Picker Modal -->
+    <div class="modal fade" id="folderPickerModal" tabindex="-1" aria-labelledby="folderPickerModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="folderPickerModalLabel">Select a Folder</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="folderPickerBody">
+                    <!-- Folders will be listed here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="folderPickerSelectBtn" disabled>Select</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedPreset = null;
+        let presets = {};
+        let folderPickerCallback = null;
+        let folderPickerSelected = null;
+        let ws = null;
+
+        // Lightbox State
+        let currentVideoList = [];
+        let currentVideoIndex = -1;
+        let currentUsername = "";
+
+        async function loadPresets() {
+            const res = await fetch('/api/presets');
+            presets = await res.json();
+            renderPresetList();
+        }
+
+        function renderPresetList() {
+            const presetList = document.getElementById('presetList');
+            presetList.innerHTML = '';
+            Object.keys(presets).forEach(name => {
+                const card = document.createElement('div');
+                card.className = 'preset-card mb-2' + (selectedPreset === name ? ' selected' : '');
+                card.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${name}</strong>
+                            <div class="text-muted small">${presets[name].description || ''}</div>
+                        </div>
+                        <button class="btn btn-sm btn-danger" onclick="deletePreset('${name}'); event.stopPropagation();">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                card.onclick = () => {
+                    selectedPreset = name;
+                    renderPresetList();
+                    renderConfigEditor();
+                };
+                presetList.appendChild(card);
+            });
+            if (Object.keys(presets).length === 0) {
+                renderConfigEditor(); // Show "No preset selected" message
+            }
+        }
+
+        function renderConfigEditor() {
+            const editor = document.getElementById('configEditor');
+            if (!selectedPreset || !presets[selectedPreset]) {
+                editor.innerHTML = '<div class="alert alert-warning">No preset selected.</div>';
+                return;
+            }
+            const preset = presets[selectedPreset];
+            editor.innerHTML = `
+                <div>
+                    <label class="form-label">Preset Name</label>
+                    <input class="form-control mb-2" value="${selectedPreset}" disabled>
+                </div>
+                <div>
+                    <label class="form-label">Description</label>
+                    <input class="form-control mb-2" value="${preset.description || ''}" disabled>
+                </div>
+                <div>
+                    <label class="form-label">Segments</label>
+                    <ul class="list-group mb-2">
+                        ${preset.segments.map(seg => `
+                            <li class="list-group-item">
+                                <strong>${seg.type}</strong> from <code>${seg.source}</code> for <b>${seg.duration}s</b>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                <div>
+                    <label class="form-label">Text Overlays</label>
+                    <ul class="list-group mb-2">
+                        ${preset.textOverlays.map(txt => `
+                            <li class="list-group-item text-overlay-item">
+                                <b>${txt.text}</b> <br>
+                                <span class="text-muted">from ${txt.startTime}s to ${txt.endTime}s</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                <div>
+                    <label class="form-label">Output</label>
+                    <div class="mb-2">
+                        <span class="badge bg-primary">${preset.output.resolution}</span>
+                        <span class="badge bg-secondary">${preset.output.fps} FPS</span>
+                        <span class="badge bg-success">${preset.output.codec}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadTikTokUsers() {
+            try {
+                const res = await fetch('/api/list-tiktok-users');
+                const users = await res.json();
+                const select = document.getElementById('existingTikTokUsers');
+                const currentValue = select.value;
+
+                select.innerHTML = '<option value="">-- Select Downloaded User --</option>';
+                users.forEach(user => {
+                    const opt = document.createElement('option');
+                    opt.value = user;
+                    opt.textContent = user;
+                    select.appendChild(opt);
+                });
+                if (users.includes(currentValue)) select.value = currentValue;
+            } catch (err) {
+                console.error('Failed to load tiktok users:', err);
+            }
+        }
+
+        async function createVideo() {
+            if (!selectedPreset) return;
+            const tiktokUser = document.getElementById('existingTikTokUsers').value;
+
+            // Get selected videos
+            const selectedFiles = [];
+            document.querySelectorAll('.video-checkbox:checked').forEach(cb => {
+                selectedFiles.push(cb.value);
+            });
+
+            if (selectedFiles.length === 0 && tiktokUser) {
+                if (!confirm("No videos selected manually. Process all videos in the directory?")) return;
+            }
+
+            const statusArea = document.getElementById('statusArea');
+            statusArea.innerHTML = `
+                <div class="alert alert-warning">
+                    <span class="status-indicator status-processing"></span>
+                    Starting video creation...
+                </div>
+            `;
+
+            try {
+                const res = await fetch('/create-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        presetName: selectedPreset,
+                        tiktokUser: tiktokUser || null,
+                        selectedFiles: selectedFiles.length > 0 ? selectedFiles : null
+                    })
+                });
+
+
+
+                const data = await res.json();
+                if (data.success) {
+                    statusArea.innerHTML = `
+                        <div class="alert alert-success">
+                            <span class="status-indicator status-ready"></span>
+                            Successfully processed ${data.files.length} videos.
+                        </div>
+                    `;
+                } else {
+                    statusArea.innerHTML = `
+                        <div class="alert alert-danger">
+                            <span class="status-indicator status-error"></span>
+                            Error: ${data.error || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusArea.innerHTML = `
+                    <div class="alert alert-danger">
+                        <span class="status-indicator status-error"></span>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        async function deletePreset(name) {
+            if (!confirm('Delete preset "' + name + '"?')) return;
+            await fetch('/api/presets/' + name, { method: 'DELETE' });
+            await loadPresets();
+        }
+
+        function openCreatePresetModal() {
+            // Reset form
+            document.getElementById('presetForm').reset();
+            document.getElementById('segmentsContainer').innerHTML = '';
+            document.getElementById('textOverlaysContainer').innerHTML = '';
+            // Show modal
+            var modal = new bootstrap.Modal(document.getElementById('createPresetModal'));
+            modal.show();
+        }
+
+        function addSegment() {
+            const container = document.getElementById('segmentsContainer');
+            const idx = container.children.length;
+            const div = document.createElement('div');
+            div.className = 'segment-item';
+            div.dataset.state = 'expanded';
+
+            div.innerHTML = `
+                <div class="segment-expanded">
+                    <div class="mb-2">
+                        <label>Type</label>
+                        <select class="form-select" name="segmentType${idx}">
+                            <option value="video">Video</option>
+                            <option value="image">Image</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label>Source Folder</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="segmentSource${idx}" required readonly>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openFolderPicker(this)">Pick Folder</button>
+                        </div>
+                        <button type="button" class="btn btn-link btn-sm" onclick="openFilePicker(this)">Pick File</button>
+                    </div>
+                    <div class="mb-2">
+                        <label>Duration (seconds)</label>
+                        <input type="number" class="form-control" name="segmentDuration${idx}" step="0.01" required>
+                    </div>
+                    <div class="mb-2">
+                        <label>Extensions (comma separated, e.g. .mp4,.mov)</label>
+                        <input type="text" class="form-control" name="segmentExtensions${idx}" value=".mp4,.mov,.jpg,.jpeg,.png" required>
+                    </div>
+                    <div class="mb-2">
+                        <label>File (optional)</label>
+                        <input type="text" class="form-control" name="segmentFile${idx}" readonly>
+                    </div>
+                    <button type="button" class="btn btn-success btn-sm" onclick="saveSegment(this)">Save Segment</button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.segment-item').remove()">Remove</button>
+                </div>
+                <div class="segment-collapsed d-none" onclick="expandSegment(this)">
+                    <span class="fw-bold" name="segmentSummary${idx}">[Segment summary]</span>
+                    <button type="button" class="btn btn-link btn-sm">Edit</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function addTextOverlay() {
+            const container = document.getElementById('textOverlaysContainer');
+            const idx = container.children.length;
+            const div = document.createElement('div');
+            div.className = 'text-overlay-item';
+            div.dataset.state = 'expanded';
+
+            div.innerHTML = `
+                <div class="text-overlay-expanded">
+                    <div class="mb-2">
+                        <label>Text</label>
+                        <input type="text" class="form-control" name="overlayText${idx}" required>
+                    </div>
+                    <div class="mb-2">
+                        <label>Start Time (seconds)</label>
+                        <input type="number" class="form-control" name="overlayStart${idx}" step="0.01" required>
+                    </div>
+                    <div class="mb-2">
+                        <label>End Time (seconds)</label>
+                        <input type="number" class="form-control" name="overlayEnd${idx}" step="0.01" required>
+                    </div>
+                    <div class="mb-2">
+                        <label>X (e.g. center or number)</label>
+                        <input type="text" class="form-control" name="overlayX${idx}" value="center">
+                    </div>
+                    <div class="mb-2">
+                        <label>Y (e.g. center or number)</label>
+                        <input type="text" class="form-control" name="overlayY${idx}" value="center">
+                    </div>
+                    <div class="mb-2">
+                        <label>Font Size</label>
+                        <input type="number" class="form-control" name="overlayFontSize${idx}" value="70">
+                    </div>
+                    <div class="mb-2">
+                        <label>Color</label>
+                        <input type="text" class="form-control" name="overlayColor${idx}" value="white">
+                    </div>
+                    <div class="mb-2">
+                        <label>Border Color</label>
+                        <input type="text" class="form-control" name="overlayBorderColor${idx}" value="black">
+                    </div>
+                    <div class="mb-2">
+                        <label>Border Width</label>
+                        <input type="number" class="form-control" name="overlayBorderWidth${idx}" value="6">
+                    </div>
+                    <button type="button" class="btn btn-success btn-sm" onclick="saveTextOverlay(this)">Save Text Overlay</button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.text-overlay-item').remove()">Remove</button>
+                </div>
+                <div class="text-overlay-collapsed d-none" onclick="expandTextOverlay(this)">
+                    <span class="fw-bold" name="textOverlaySummary${idx}">[Text overlay summary]</span>
+                    <button type="button" class="btn btn-link btn-sm">Edit</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        async function savePreset(event) {
+            event.preventDefault();
+            const name = document.getElementById('presetName').value.trim();
+            const description = document.getElementById('presetDescription').value.trim();
+            const resolution = document.getElementById('outputResolution').value.trim();
+            const fps = parseInt(document.getElementById('outputFps').value, 10);
+            const codec = document.getElementById('outputCodec').value.trim();
+            const audioCodec = document.getElementById('outputAudioCodec').value.trim();
+            const audioBitrate = document.getElementById('outputAudioBitrate').value.trim();
+
+            // Gather segments
+            const segments = [];
+            const segs = document.getElementById('segmentsContainer').children;
+            for (let i = 0; i < segs.length; i++) {
+                const seg = segs[i];
+                segments.push({
+                    type: seg.querySelector(`[name^="segmentType"]`).value,
+                    source: seg.querySelector(`[name^="segmentSource"]`).value,
+                    duration: parseFloat(seg.querySelector(`[name^="segmentDuration"]`).value),
+                    extensions: seg.querySelector(`[name^="segmentExtensions"]`).value.split(',').map(e => e.trim())
+                });
+            }
+
+            // Gather text overlays
+            const textOverlays = [];
+            const overlays = document.getElementById('textOverlaysContainer').children;
+            for (let i = 0; i < overlays.length; i++) {
+                const ov = overlays[i];
+                textOverlays.push({
+                    text: ov.querySelector(`[name^="overlayText"]`).value,
+                    startTime: parseFloat(ov.querySelector(`[name^="overlayStart"]`).value),
+                    endTime: parseFloat(ov.querySelector(`[name^="overlayEnd"]`).value),
+                    x: ov.querySelector(`[name^="overlayX"]`).value,
+                    y: ov.querySelector(`[name^="overlayY"]`).value,
+                    fontSize: parseInt(ov.querySelector(`[name^="overlayFontSize"]`).value, 10),
+                    color: ov.querySelector(`[name^="overlayColor"]`).value,
+                    borderColor: ov.querySelector(`[name^="overlayBorderColor"]`).value,
+                    borderWidth: parseInt(ov.querySelector(`[name^="overlayBorderWidth"]`).value, 10)
+                });
+            }
+
+            // Build preset object
+            const preset = {
+                description,
+                segments,
+                textOverlays,
+                output: {
+                    resolution,
+                    fps,
+                    codec,
+                    audioCodec,
+                    audioBitrate
+                }
+            };
+
+            // Save to backend
+            const res = await fetch('/api/presets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, config: preset })
+            });
+            if (res.ok) {
+                await loadPresets();
+                var modal = bootstrap.Modal.getInstance(document.getElementById('createPresetModal'));
+                modal.hide();
+            } else {
+                alert('Failed to save preset');
+            }
+        }
+
+        function setStatus(msg, type) {
+            const statusArea = document.getElementById('statusArea');
+            let indicator = '<span class="status-indicator status-ready"></span>';
+            if (type === 'processing') indicator = '<span class="status-indicator status-processing"></span>';
+            if (type === 'error') indicator = '<span class="status-indicator status-error"></span>';
+            statusArea.innerHTML = `<div class="alert alert-${type === 'error' ? 'danger' : (type === 'processing' ? 'warning' : 'info')}">${indicator}${msg}</div>`;
+        }
+
+        function openFolderPicker(btn) {
+            const segmentDiv = btn.closest('.segment-item');
+            const sourceInput = segmentDiv.querySelector('input[name^="segmentSource"]');
+            folderPickerCallback = (folder) => {
+                sourceInput.value = folder;
+            };
+            folderPickerSelected = null;
+            showFolderPicker();
+        }
+
+        async function showFolderPicker() {
+            const res = await fetch('/api/list-folders');
+            const folders = await res.json();
+            const body = document.getElementById('folderPickerBody');
+            body.innerHTML = '';
+            folders.forEach(folder => {
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.textContent = folder;
+                div.onclick = () => {
+                    Array.from(body.children).forEach(child => child.classList.remove('selected'));
+                    div.classList.add('selected');
+                    folderPickerSelected = folder;
+                    document.getElementById('folderPickerSelectBtn').disabled = false;
+                };
+                body.appendChild(div);
+            });
+            document.getElementById('folderPickerSelectBtn').onclick = () => {
+                if (folderPickerCallback && folderPickerSelected) {
+                    folderPickerCallback(folderPickerSelected);
+                }
+                var modal = bootstrap.Modal.getInstance(document.getElementById('folderPickerModal'));
+                modal.hide();
+            };
+            document.getElementById('folderPickerSelectBtn').disabled = true;
+            var modal = new bootstrap.Modal(document.getElementById('folderPickerModal'));
+            modal.show();
+        }
+
+        function saveSegment(btn) {
+            const segmentDiv = btn.closest('.segment-item');
+            // Gather values for summary
+            const type = segmentDiv.querySelector('select[name^="segmentType"]').value;
+            const source = segmentDiv.querySelector('input[name^="segmentSource"]').value;
+            const duration = segmentDiv.querySelector('input[name^="segmentDuration"]').value;
+            const file = segmentDiv.querySelector('input[name^="segmentFile"]').value;
+            // Set summary text
+            const summary = `[${type}] from "${source}" for ${duration}s${file ? ` (file: ${file})` : ''}`;
+            segmentDiv.querySelector('[name^="segmentSummary"]').textContent = summary;
+            // Collapse
+            segmentDiv.querySelector('.segment-expanded').classList.add('d-none');
+            segmentDiv.querySelector('.segment-collapsed').classList.remove('d-none');
+            segmentDiv.dataset.state = 'collapsed';
+        }
+
+        function expandSegment(collapsedDiv) {
+            const segmentDiv = collapsedDiv.closest('.segment-item');
+            segmentDiv.querySelector('.segment-expanded').classList.remove('d-none');
+            segmentDiv.querySelector('.segment-collapsed').classList.add('d-none');
+            segmentDiv.dataset.state = 'expanded';
+        }
+
+        function saveTextOverlay(btn) {
+            const overlayDiv = btn.closest('.text-overlay-item');
+            // Gather values for summary
+            const text = overlayDiv.querySelector('input[name^="overlayText"]').value;
+            const startTime = overlayDiv.querySelector('input[name^="overlayStart"]').value;
+            const endTime = overlayDiv.querySelector('input[name^="overlayEnd"]').value;
+            const fontSize = overlayDiv.querySelector('input[name^="overlayFontSize"]').value;
+            const color = overlayDiv.querySelector('input[name^="overlayColor"]').value;
+
+            // Set summary text
+            const summary = `"${text}" from ${startTime}s to ${endTime}s (${fontSize}px, ${color})`;
+            overlayDiv.querySelector('[name^="textOverlaySummary"]').textContent = summary;
+
+            // Collapse
+            overlayDiv.querySelector('.text-overlay-expanded').classList.add('d-none');
+            overlayDiv.querySelector('.text-overlay-collapsed').classList.remove('d-none');
+            overlayDiv.dataset.state = 'collapsed';
+        }
+
+        function expandTextOverlay(collapsedDiv) {
+            const overlayDiv = collapsedDiv.closest('.text-overlay-item');
+            overlayDiv.querySelector('.text-overlay-expanded').classList.remove('d-none');
+            overlayDiv.querySelector('.text-overlay-collapsed').classList.add('d-none');
+            overlayDiv.dataset.state = 'expanded';
+        }
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'progress') {
+                    updateProgress(data.data);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                setTimeout(connectWebSocket, 1000); // Reconnect after 1 second
+            };
+        }
+
+        async function scrapeTikTok() {
+            const username = document.getElementById('tiktokUsername').value.trim();
+            if (!username) {
+                alert('Please enter a TikTok username');
+                return;
+            }
+
+            const btn = document.getElementById('scrapeBtn');
+            const statusDiv = document.getElementById('scrapeStatus');
+            const statusText = document.getElementById('scrapeStatusText');
+            const pgBar = document.getElementById('scrapeProgressBar');
+
+            btn.classList.add('d-none');
+            document.getElementById('stopScrapeBtn').classList.remove('d-none');
+            statusDiv.classList.remove('d-none');
+            statusText.textContent = 'Starting scraper...';
+            pgBar.style.width = '5%';
+
+
+            try {
+                const res = await fetch('/api/scrape-tiktok', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+
+                document.getElementById('stopScrapeBtn').classList.add('d-none');
+                document.getElementById('scrapeBtn').classList.remove('d-none');
+
+
+                const data = await res.json();
+                if (data.success) {
+                    statusText.textContent = `Success! Downloaded ${data.files.length} videos. Folder "${username}" is now available.`;
+                    pgBar.style.width = '100%';
+                    pgBar.classList.remove('progress-bar-animated');
+                    await loadTikTokUsers();
+                    const cleanUser = username.startsWith('@') ? username.slice(1) : username;
+                    document.getElementById('existingTikTokUsers').value = cleanUser;
+                    onUserSelectChange(); // Load the video list
+                } else {
+
+
+
+                    statusText.textContent = 'Error: ' + (data.error || 'Unknown error');
+                    pgBar.classList.replace('bg-dark', 'bg-danger');
+                }
+            } catch (error) {
+                statusText.textContent = 'Error: ' + error.message;
+                pgBar.classList.replace('bg-dark', 'bg-danger');
+            } finally {
+                btn.classList.remove('d-none');
+                document.getElementById('stopScrapeBtn').classList.add('d-none');
+            }
+
+        }
+
+        function updateProgress(progress) {
+            const statusArea = document.getElementById('statusArea');
+
+            // Handle Scraper Progress
+            if (progress.type === 'scraper') {
+                const pgBar = document.getElementById('scrapeProgressBar');
+                const statusText = document.getElementById('scrapeStatusText');
+
+                if (progress.status === 'scraping_links') {
+                    statusText.textContent = progress.message;
+                    pgBar.style.width = '20%';
+                } else if (progress.status === 'links_found') {
+                    statusText.textContent = `Found ${progress.count} videos. Starting downloads...`;
+                    pgBar.style.width = '30%';
+                } else if (progress.status === 'downloading') {
+                    const percent = 30 + (progress.current / progress.total * 70);
+                    statusText.textContent = `Downloading ${progress.current}/${progress.total}: ${progress.message}`;
+                    pgBar.style.width = `${percent}%`;
+                }
+                return;
+            }
+
+            // Handle Video Creation Progress (existing logic)
+            if (progress.status === 'processing') {
+                statusArea.innerHTML = `
+                    <div class="alert alert-warning">
+                        <span class="status-indicator status-processing"></span>
+                        Processing video ${progress.current} of ${progress.total}: ${progress.file}
+                    </div>
+                `;
+            } else if (progress.status === 'completed') {
+                statusArea.innerHTML = `
+                    <div class="alert alert-success">
+                        <span class="status-indicator status-ready"></span>
+                        Completed video ${progress.current} of ${progress.total}: ${progress.file}
+                    </div>
+                `;
+            } else if (progress.status === 'error') {
+                statusArea.innerHTML = `
+                    <div class="alert alert-danger">
+                        <span class="status-indicator status-error"></span>
+                        Error processing video ${progress.current} of ${progress.total}: ${progress.file}
+                        <div class="small">${progress.error || 'Unknown error'}</div>
+                    </div>
+                `;
+            }
+        }
+
+
+        async function stopScrape() {
+            try {
+                await fetch('/api/stop-scrape', { method: 'POST' });
+                document.getElementById('scrapeStatusText').textContent = 'Stopping... please wait for existing tasks to finish.';
+            } catch (err) {
+                console.error('Stop failed:', err);
+            }
+        }
+
+        async function onUserSelectChange() {
+            const user = document.getElementById('existingTikTokUsers').value;
+            if (!user) {
+                document.getElementById('videoSelectionSection').classList.add('d-none');
+                return;
+            }
+            await loadVideosForUser(user);
+        }
+
+        async function loadVideosForUser(username) {
+            currentUsername = username;
+            try {
+                const res = await fetch(`/api/list-videos/${username}`);
+                const videos = await res.json();
+                currentVideoList = videos; // Store globally for lightbox
+                const list = document.getElementById('videoList');
+                const section = document.getElementById('videoSelectionSection');
+                list.innerHTML = '';
+
+                if (videos.length === 0) {
+                    section.classList.add('d-none');
+                    return;
+                }
+
+                section.classList.remove('d-none');
+                videos.forEach((vid, index) => {
+                    const col = document.createElement('div');
+                    col.className = 'col';
+                    col.innerHTML = `
+                        <div class="card h-100 shadow-sm video-card">
+                            <div class="position-relative">
+                                <img src="/api/thumbnail/${username}/${vid}" 
+                                     class="card-img-top bg-black" 
+                                     style="height: 150px; cursor: pointer; object-fit: cover;" 
+                                     onclick="openLightbox(${index})"
+                                     loading="lazy"
+                                     alt="${vid}">
+                                <div class="position-absolute top-0 end-0 m-2">
+                                    <input class="form-check-input video-checkbox" type="checkbox" value="${vid}" id="check_${vid}" checked onclick="event.stopPropagation()">
+                                </div>
+                                <div class="position-absolute bottom-0 end-0 m-2 pointer-events-none">
+                                    <i class="fas fa-play-circle text-white opacity-75 fs-4"></i>
+                                </div>
+                            </div>
+                            <div class="card-body p-2">
+                                <label class="small text-truncate w-100 mb-0" style="cursor: pointer;" for="check_${vid}">${vid}</label>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(col);
+                });
+
+
+
+            } catch (err) {
+                console.error('Failed to load videos:', err);
+            }
+        }
+
+        function openLightbox(index) {
+            currentVideoIndex = index;
+            const video = currentVideoList[index];
+            const videoPlayer = document.getElementById('lightboxVideo');
+            const title = document.getElementById('lightboxTitle');
+
+            // Re-prime video player
+            videoPlayer.pause();
+            videoPlayer.src = `/tiktokvideos/${currentUsername}/${video}`;
+            videoPlayer.load();
+            title.textContent = `${video} (${index + 1} / ${currentVideoList.length})`;
+
+            const modalEl = document.getElementById('videoLightboxModal');
+            let modal = bootstrap.Modal.getInstance(modalEl);
+            if (!modal) modal = new bootstrap.Modal(modalEl);
+            modal.show();
+
+            // Clear src when modal hidden to stop video
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                videoPlayer.pause();
+                videoPlayer.src = "";
+                videoPlayer.load();
+            }, { once: true });
+
+            // Small delay before playing to ensure rendering primes correctly
+            videoPlayer.play().catch(e => console.log("Auto-play blocked or failed", e));
+
+            updateLightboxSelection(video);
+        }
+
+        function navigateLightbox(direction) {
+            let nextIndex = currentVideoIndex + direction;
+            if (nextIndex < 0) nextIndex = currentVideoList.length - 1;
+            if (nextIndex >= currentVideoList.length) nextIndex = 0;
+
+            currentVideoIndex = nextIndex;
+            const video = currentVideoList[currentVideoIndex];
+            const videoPlayer = document.getElementById('lightboxVideo');
+            const title = document.getElementById('lightboxTitle');
+
+            videoPlayer.pause();
+            videoPlayer.src = `/tiktokvideos/${currentUsername}/${video}`;
+            videoPlayer.load();
+            title.textContent = `${video} (${currentVideoIndex + 1} / ${currentVideoList.length})`;
+            videoPlayer.play().catch(e => console.log("Navigate play failed", e));
+
+            updateLightboxSelection(video);
+        }
+
+        function updateLightboxSelection(filename) {
+            const checkbox = document.getElementById(`check_${filename}`);
+            const toggle = document.getElementById('lightboxSelectionToggle');
+            if (checkbox && toggle) {
+                toggle.checked = checkbox.checked;
+            }
+        }
+
+        function toggleSelectionFromLightbox() {
+            const video = currentVideoList[currentVideoIndex];
+            const toggle = document.getElementById('lightboxSelectionToggle');
+            const checkbox = document.getElementById(`check_${video}`);
+            if (checkbox && toggle) {
+                checkbox.checked = toggle.checked;
+            }
+        }
+
+        // Add keyboard support
+        document.addEventListener('keydown', (e) => {
+            const modalEl = document.getElementById('videoLightboxModal');
+            if (!modalEl || !modalEl.classList.contains('show')) return;
+
+            if (e.key === 'ArrowRight') navigateLightbox(1);
+            if (e.key === 'ArrowLeft') navigateLightbox(-1);
+            if (e.key === 'Escape') {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        });
+
+        function toggleAllVideos(checked) {
+            document.querySelectorAll('.video-checkbox').forEach(cb => cb.checked = checked);
+        }
+
+        async function loadImages() {
+            try {
+                const res = await fetch('/api/images');
+                const images = await res.json();
+                const list = document.getElementById('imageList');
+                list.innerHTML = '';
+
+                if (images.length === 0) {
+                    list.innerHTML = '<div class="text-muted small">No images found in tiktokimages/</div>';
+                    return;
+                }
+
+                images.forEach(img => {
+                    const div = document.createElement('div');
+                    div.className = 'position-relative border rounded p-1 text-center bg-white';
+                    div.style.width = '100px';
+                    div.innerHTML = `
+                        <img src="/tiktokimages/${img}" style="max-width: 80px; max-height: 60px; display: block; margin: 0 auto 5px;">
+                        <div class="small text-truncate" title="${img}" style="font-size: 10px; max-width: 90px;">${img}</div>
+                        <button class="btn btn-danger btn-sm status-indicator" 
+                                style="position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; padding: 0; line-height: 1;"
+                                onclick="deleteImage('${img}')">×</button>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (err) {
+                console.error('Failed to load images:', err);
+            }
+        }
+
+        async function uploadImage() {
+            const input = document.getElementById('imageUploadInput');
+            const status = document.getElementById('uploadStatus');
+            if (input.files.length === 0) return;
+
+            const formData = new FormData();
+            formData.append('image', input.files[0]);
+
+            status.textContent = 'Uploading...';
+            status.className = 'mt-2 small text-primary';
+
+            try {
+                const res = await fetch('/api/upload-image', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    status.textContent = 'Uploaded successfully!';
+                    status.className = 'mt-2 small text-success';
+                    input.value = '';
+                    loadImages();
+                } else {
+                    const data = await res.json();
+                    status.textContent = 'Error: ' + (data.error || 'Upload failed');
+                    status.className = 'mt-2 small text-danger';
+                }
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                status.className = 'mt-2 small text-danger';
+            }
+        }
+
+        async function deleteImage(filename) {
+            if (!confirm(`Delete image ${filename}?`)) return;
+            try {
+                const res = await fetch(`/api/images/${filename}`, { method: 'DELETE' });
+                if (res.ok) {
+                    loadImages();
+                } else {
+                    alert('Delete failed');
+                }
+            } catch (err) {
+                console.error('Delete error:', err);
+            }
+        }
+
+        // Initialize WebSocket when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            connectWebSocket();
+            loadPresets();
+            loadTikTokUsers();
+            loadImages();
+        });
+
+
+    </script>
+</body>
+
+</html>
